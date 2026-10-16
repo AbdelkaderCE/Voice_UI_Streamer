@@ -71,24 +71,43 @@ export default function App() {
     (phrase) => {
       const actions = parseCommands(phrase)
       if (actions.length > 0) {
+        console.info('[Command parser] Matched regex actions', { count: actions.length })
         setGeminiError(null)
         executeActions(actions)
         return
       }
 
+      console.info('[Command parser] No match; using Gemini fallback', {
+        transcriptCharacters: phrase.length,
+      })
       setGeminiError(null)
       setAiPending((pending) => pending + 1)
+      const startedAt = Date.now()
+      console.info('[Gemini fallback] Request started')
       void parseWithGemini(phrase)
-        .then(executeGeminiAction)
+        .then((result) => {
+          const elapsedMs = Date.now() - startedAt
+          if (result.action === 'NONE') {
+            console.info('[Gemini fallback] Completed without a canvas action', { elapsedMs })
+            setGeminiError(
+              'AI analyzed the phrase but did not find a canvas command. Try: “Create 3 cards about growth, strategy, and marketing.”',
+            )
+            return
+          }
+          console.info('[Gemini fallback] Completed', { action: result.action, elapsedMs })
+          setGeminiError(null)
+          executeGeminiAction(result)
+        })
         .catch((error) => {
-          const message = error instanceof Error ? error.message : ''
-          setGeminiError(
-            message.startsWith('Add a Google') ||
-              message.startsWith('Gemini returned') ||
-              message.startsWith('Gemini did not')
-              ? message
-              : 'Gemini fallback failed. Check the key restrictions and internet connection.',
-          )
+          const message =
+            error instanceof Error
+              ? error.message
+              : 'Gemini fallback failed. Check the key restrictions and internet connection.'
+          console.error('[Gemini fallback] Failed', {
+            elapsedMs: Date.now() - startedAt,
+            message,
+          })
+          setGeminiError(message)
         })
         .finally(() => setAiPending((pending) => Math.max(0, pending - 1)))
     },
