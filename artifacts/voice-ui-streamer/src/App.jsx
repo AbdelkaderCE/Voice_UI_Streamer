@@ -19,9 +19,13 @@ export default function App() {
       const actions = parseCommands(phrase)
       if (actions.length === 0) return
       actions.forEach((action) => dispatch(action))
-      setLastAction({ id: Date.now(), text: actions.map(describeAction).join(' · ') })
+      const cardCount = cards.length
+      setLastAction({
+        id: Date.now(),
+        text: actions.map((action) => describeAction(action, { cardCount })).join(' · '),
+      })
     },
-    [dispatch],
+    [dispatch, cards.length],
   )
 
   const { supported, listening, finalText, interimText, error, start, stop, reset } =

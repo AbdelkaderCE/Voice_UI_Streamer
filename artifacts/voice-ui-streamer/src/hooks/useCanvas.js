@@ -41,6 +41,12 @@ function reducer(state, action) {
     }
     case 'REMOVE_LAST':
       return { ...state, cards: state.cards.slice(0, -1) }
+    case 'REMOVE_AT': {
+      // `position` is 1-based, the way people say it ("remove the 5th card").
+      const index = action.position - 1
+      if (index < 0 || index >= state.cards.length) return state
+      return { ...state, cards: state.cards.filter((_, i) => i !== index) }
+    }
     case 'CLEAR':
       return { ...state, cards: [] }
     case 'SET_LAYOUT':

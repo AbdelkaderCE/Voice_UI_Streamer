@@ -20,6 +20,7 @@ export function useSpeechRecognition({ lang = 'en-US', onFinalResult } = {}) {
 
   const recognitionRef = useRef(null)
   const wantListeningRef = useRef(false) // what the user asked for, vs. what the engine is doing
+  const networkFailuresRef = useRef(0) // consecutive "network" errors with no speech result in between
   const onFinalRef = useRef(onFinalResult)
 
   useEffect(() => {
@@ -40,6 +41,9 @@ export function useSpeechRecognition({ lang = 'en-US', onFinalResult } = {}) {
     recognition.onstart = () => setListening(true)
 
     recognition.onresult = (event) => {
+      // Getting results again means any earlier connection problem is over.
+      networkFailuresRef.current = 0
+      setError(null)
       let interim = ''
       let finalChunk = ''
       for (let i = event.resultIndex; i < event.results.length; i += 1) {
@@ -63,7 +67,10 @@ export function useSpeechRecognition({ lang = 'en-US', onFinalResult } = {}) {
         wantListeningRef.current = false
         setError('Microphone access was blocked. Allow it in the browser address bar and try again.')
       } else if (event.error === 'network') {
+        networkFailuresRef.current += 1
         setError('Speech recognition needs an internet connection in Chrome.')
+        // Give up after a few failures in a row instead of retrying forever.
+        if (networkFailuresRef.current >= 5) wantListeningRef.current = false
       } else if (event.error === 'audio-capture') {
         wantListeningRef.current = false
         setError('No microphone was found.')
@@ -101,6 +108,7 @@ export function useSpeechRecognition({ lang = 'en-US', onFinalResult } = {}) {
   const start = useCallback(() => {
     if (!recognitionRef.current) return
     setError(null)
+    networkFailuresRef.current = 0
     wantListeningRef.current = true
     try {
       recognitionRef.current.start()

@@ -15,6 +15,7 @@ const EXAMPLES = [
   'Create a card titled Strategy',
   'Add 2 cards',
   'Switch to list view',
+  'Remove the 2nd card',
   'Remove the last card',
   'Clear screen',
 ]
