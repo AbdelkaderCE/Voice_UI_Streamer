@@ -6,26 +6,93 @@ import MicButton from './components/MicButton'
 import Teleprompter from './components/Teleprompter'
 import { useCanvas } from './hooks/useCanvas'
 import { useSpeechRecognition } from './hooks/useSpeechRecognition'
-import { describeAction, parseCommands } from './lib/commandParser'
+import { describeAction, MAX_CARDS, parseCommands } from './lib/commandParser'
+import { parseWithGemini } from './lib/geminiService'
 
 export default function App() {
   const { cards, layout, dispatch } = useCanvas()
   const [lastAction, setLastAction] = useState(null)
   const [typed, setTyped] = useState('')
+  const [aiPending, setAiPending] = useState(0)
+  const [geminiError, setGeminiError] = useState(null)
 
-  // Every finished phrase (spoken or typed) goes through the command parser.
-  const handlePhrase = useCallback(
-    (phrase) => {
-      const actions = parseCommands(phrase)
+  const executeActions = useCallback(
+    (actions) => {
       if (actions.length === 0) return
       actions.forEach((action) => dispatch(action))
-      const cardCount = cards.length
       setLastAction({
         id: Date.now(),
-        text: actions.map((action) => describeAction(action, { cardCount })).join(' · '),
+        text: actions.map((action) => describeAction(action, { cardCount: cards.length })).join(' · '),
       })
     },
     [dispatch, cards.length],
+  )
+
+  const executeGeminiAction = useCallback(
+    (result) => {
+      const actions = []
+      const availableSlots = Math.max(0, MAX_CARDS - cards.length)
+
+      switch (result.action) {
+        case 'SPAWN_CARDS': {
+          const count = Math.min(
+            availableSlots,
+            Math.max(result.count, result.titles.length),
+          )
+          const titles = result.titles.slice(0, count)
+          titles.forEach((title) => actions.push({ type: 'ADD_TITLED', title }))
+          const untitledCount = count - titles.length
+          if (untitledCount > 0) actions.push({ type: 'ADD_CARDS', count: untitledCount })
+          break
+        }
+        case 'REMOVE_CARDS': {
+          const count = Math.min(cards.length, Math.max(1, result.count))
+          for (let i = 0; i < count; i += 1) actions.push({ type: 'REMOVE_LAST' })
+          break
+        }
+        case 'CHANGE_LAYOUT':
+          actions.push({ type: 'SET_LAYOUT', layout: result.layout })
+          break
+        case 'CLEAR_SCREEN':
+          actions.push({ type: 'CLEAR' })
+          break
+        case 'NONE':
+        default:
+          break
+      }
+
+      executeActions(actions)
+    },
+    [cards.length, executeActions],
+  )
+
+  // The local regex parser stays on the immediate path; Gemini only sees misses.
+  const handlePhrase = useCallback(
+    (phrase) => {
+      const actions = parseCommands(phrase)
+      if (actions.length > 0) {
+        setGeminiError(null)
+        executeActions(actions)
+        return
+      }
+
+      setGeminiError(null)
+      setAiPending((pending) => pending + 1)
+      void parseWithGemini(phrase)
+        .then(executeGeminiAction)
+        .catch((error) => {
+          const message = error instanceof Error ? error.message : ''
+          setGeminiError(
+            message.startsWith('Add a Google') ||
+              message.startsWith('Gemini returned') ||
+              message.startsWith('Gemini did not')
+              ? message
+              : 'Gemini fallback failed. Check the key restrictions and internet connection.',
+          )
+        })
+        .finally(() => setAiPending((pending) => Math.max(0, pending - 1)))
+    },
+    [executeActions, executeGeminiAction],
   )
 
   const { supported, listening, finalText, interimText, error, start, stop, reset } =
@@ -56,7 +123,19 @@ export default function App() {
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Voice UI Streamer</h1>
-          <p className="text-sm text-white/50">Speak, and watch it appear.</p>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <p className="text-sm text-white/50">Speak, and watch it appear.</p>
+            {aiPending > 0 && (
+              <span
+                role="status"
+                aria-live="polite"
+                className="inline-flex items-center gap-2 rounded-full border border-violet-400/30 bg-violet-500/10 px-2.5 py-1 text-xs text-violet-200"
+              >
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-violet-300" />
+                AI Analyzing...
+              </span>
+            )}
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center rounded-full border border-white/15 p-0.5">
@@ -84,6 +163,11 @@ export default function App() {
       {error && (
         <div className="rounded-xl border border-rose-400/30 bg-rose-400/10 p-4 text-sm text-rose-200">
           {error}
+        </div>
+      )}
+      {geminiError && (
+        <div role="alert" className="rounded-xl border border-amber-400/30 bg-amber-400/10 p-4 text-sm text-amber-200">
+          {geminiError}
         </div>
       )}
 
