@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Voice UI Streamer"
+description = "A browser-based live speech teleprompter that listens through the microphone and displays recognized speech as it is spoken."
+version = "1.0.0"
+id = "artifacts/voice-ui-streamer"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 18789
+
+[services.development]
+run = "pnpm --filter @workspace/voice-ui-streamer run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/voice-ui-streamer", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/voice-ui-streamer/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18789"
+BASE_PATH = "/"
