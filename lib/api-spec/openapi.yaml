@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: gemini
+    description: Gemini command interpretation
 paths:
   /healthz:
     get:
@@ -24,6 +26,55 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /gemini/parse:
+    post:
+      operationId: parseGeminiCommand
+      tags: [gemini]
+      summary: Interpret a spoken UI command
+      description: Converts a transcript into a validated Voice UI Streamer canvas action.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GeminiCommandInput"
+      responses:
+        "200":
+          description: Interpreted command
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GeminiCommandResponse"
+        "400":
+          description: Invalid transcript request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "429":
+          description: Gemini quota or rate limit
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "502":
+          description: Gemini service rejected or failed the request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "503":
+          description: Server-side Gemini key is not configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "504":
+          description: Gemini request timed out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
 components:
   schemas:
     HealthStatus:
@@ -33,4 +84,44 @@ components:
           type: string
       required:
         - status
+    GeminiCommandInput:
+      type: object
+      properties:
+        transcript:
+          type: string
+          minLength: 1
+          maxLength: 2000
+      required:
+        - transcript
+    GeminiCommandResponse:
+      type: object
+      properties:
+        action:
+          type: string
+          enum: [SPAWN_CARDS, REMOVE_CARDS, CHANGE_LAYOUT, CLEAR_SCREEN, NONE]
+        count:
+          type: integer
+          minimum: 0
+          maximum: 24
+        titles:
+          type: array
+          maxItems: 24
+          items:
+            type: string
+            maxLength: 60
+        layout:
+          type: string
+          enum: [grid, list]
+      required:
+        - action
+        - count
+        - titles
+        - layout
+    ApiError:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
 

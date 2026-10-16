@@ -171,6 +171,9 @@ importers:
 
   artifacts/api-server:
     dependencies:
+      '@google/genai':
+        specifier: ^2.30.0
+        version: 2.30.0
       '@workspace/api-zod':
         specifier: workspace:*
         version: link:../../lib/api-zod
@@ -405,10 +408,6 @@ importers:
         version: 3.25.76
 
   artifacts/voice-ui-streamer:
-    dependencies:
-      '@google/genai':
-        specifier: ^2.30.0
-        version: 2.30.0
     devDependencies:
       '@hookform/resolvers':
         specifier: ^3.10.0
