@@ -1,7 +1,6 @@
 import { Router, type IRouter } from "express";
 import {
   ParseGeminiCommandBody,
-  ParseGeminiCommandResponse,
 } from "@workspace/api-zod";
 import {
   GeminiServiceError,
@@ -25,18 +24,8 @@ router.post("/gemini/parse", async (req, res): Promise<void> => {
 
   try {
     const result = await parseGeminiTranscript(parsedRequest.data.transcript);
-    const parsedResponse = ParseGeminiCommandResponse.safeParse(result);
-    if (!parsedResponse.success) {
-      req.log.error(
-        { issueCount: parsedResponse.error.issues.length },
-        "Gemini command response failed schema validation",
-      );
-      res.status(502).json({ error: "Gemini returned an invalid command." });
-      return;
-    }
-
-    req.log.info({ action: parsedResponse.data.action }, "Gemini command parsed");
-    res.json(parsedResponse.data);
+    req.log.info({ action: result.action }, "Gemini visual command processed");
+    res.json(result);
   } catch (error) {
     if (error instanceof GeminiServiceError) {
       req.log.warn(
