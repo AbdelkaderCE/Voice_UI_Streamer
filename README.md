@@ -2,10 +2,6 @@ Voice UI Streamer is a browser app that listens to your microphone and turns spe
 
 # Voice UI Streamer
 
-## Demo
-
-![Voice UI Streamer demo](./attached_assets/image_1792179607262.png)
-
 ## Quick start (copy/paste)
 
 ```bash
